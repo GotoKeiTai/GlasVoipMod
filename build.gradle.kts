@@ -1,3 +1,14 @@
+import java.io.FileInputStream
+import java.util.Properties
+
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        load(FileInputStream(localPropertiesFile))
+    }
+}
+val pzInstallPath: String? = localProperties.getProperty("pz.install.path")?.ifBlank { null }
+
 plugins {
     java
 }
@@ -12,6 +23,10 @@ repositories {
 dependencies {
     implementation("org.ow2.asm:asm:9.10.1")
     implementation("org.ow2.asm:asm-util:9.10.1")
+
+    if (pzInstallPath != null) {
+        compileOnly(files(pzInstallPath))
+    }
 
     testImplementation(platform("org.junit:junit-bom:5.12.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")

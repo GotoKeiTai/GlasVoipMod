@@ -1,0 +1,17 @@
+# Copy this file to local.properties (gitignored, one per development machine) and
+# point it at your own Project Zomboid installation's compiled Java classes
+# directory (the folder containing a `zombie/` subfolder). Required to compile
+# glas.voip.patch.LuaGlobalTierProvider, which references the game's own
+# LuaManager/KahluaTable classes at compile time only -- see the `compileOnly`
+# dependency in build.gradle.kts. Nothing from the game is ever bundled into
+# this project's own output jar, and this file's actual contents are never
+# committed.
+#
+# macOS Steam default (confirmed on this project's dev machine):
+# pz.install.path=/Users/<you>/Library/Application Support/Steam/steamapps/common/ProjectZomboid/Project Zomboid.app/Contents/Java
+#
+# Windows: locate the equivalent folder under your Steam library's
+# steamapps/common/ProjectZomboid install (path not yet confirmed on Windows --
+# look for the folder containing zombie/, media/, and similar subfolders).
+
+pz.install.path=
