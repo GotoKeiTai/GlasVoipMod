@@ -13,7 +13,7 @@ plugins {
 }
 
 group = "glas.voip"
-version = "1.0.0"
+version = (findProperty("version") as String?)?.takeIf { it != "unspecified" } ?: "1.0.0"
 
 repositories {
     mavenCentral()

@@ -24,7 +24,9 @@ jobs:
           cache: gradle
 
       - name: Build jar
-        run: ./gradlew jar --console=plain
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          ./gradlew jar -Pversion="${VERSION}" --console=plain
 
       - name: Prepare release assets
         id: assets
@@ -50,6 +52,9 @@ jobs:
       - name: Create GitHub Release
         run: |
           NOTES="$(git tag -l --format='%(contents)' "${GITHUB_REF_NAME}")"
+          if [ -z "$NOTES" ]; then
+            echo "::warning::Tag ${GITHUB_REF_NAME} has no annotation (was it pushed with 'git tag' instead of 'git tag -a -m ...'?); release notes will be empty."
+          fi
           gh release create "${GITHUB_REF_NAME}" \
             --title "${GITHUB_REF_NAME}" \
             --notes "${NOTES}" \
