@@ -93,6 +93,24 @@ missing, check the console for exceptions from
 (`zombie/core/raknet/VoiceManager`) not matching if a future game
 update renamed or relocated the class.
 
+## Keeping the two mod copies in sync
+
+`mods/GlasVoipMod/` (used for local testing above) and
+`Contents/mods/GlasVoipMod/` (the Steam Workshop upload copy) are two
+separate, git-tracked copies of the same `mod.info` and `.lua` files --
+they are not kept in sync automatically. After editing anything under
+`mods/GlasVoipMod/`, re-copy it (and the images) into
+`Contents/mods/GlasVoipMod/`/root `preview.png` before re-publishing to
+the Workshop:
+
+```bash
+cp mods/GlasVoipMod/mod.info Contents/mods/GlasVoipMod/mod.info
+cp assets/poster.png Contents/mods/GlasVoipMod/poster.png
+cp mods/GlasVoipMod/media/lua/client/GlasVoip/*.lua Contents/mods/GlasVoipMod/media/lua/client/GlasVoip/
+cp mods/GlasVoipMod/media/lua/server/GlasVoip/*.lua Contents/mods/GlasVoipMod/media/lua/server/GlasVoip/
+cp assets/preview.png preview.png
+```
+
 ## Publishing to the Steam Workshop (manual step)
 
 This can't be automated from outside the game -- Steam Workshop
