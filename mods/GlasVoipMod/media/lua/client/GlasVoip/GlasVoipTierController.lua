@@ -21,6 +21,15 @@ local function cycleTier()
 end
 
 local function onKeyStartPressed(key)
+    -- Events.OnKeyStartPressed is a raw keyboard event delivered regardless of UI focus --
+    -- unlike vanilla actions routed through the keybinding system, it fires even while the
+    -- player is typing in chat. Without this guard, every "b" typed in a chat message (e.g.
+    -- "brb") would also cycle the tier and fire a network command. ISChat.focused is the same
+    -- flag ISChat.lua itself checks for this purpose (confirmed in the vanilla source).
+    if ISChat and ISChat.focused then
+        return
+    end
+
     if key == Keyboard.KEY_B then
         cycleTier()
     end
