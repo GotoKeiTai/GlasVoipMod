@@ -1,3 +1,4 @@
 UI_FR = {
     UI_optionscreen_binding_Glas VOIP = "Glas VOIP",
+    UI_optionscreen_binding_Cycle VOIP Tier = "Changer palier VOIP",
 }
