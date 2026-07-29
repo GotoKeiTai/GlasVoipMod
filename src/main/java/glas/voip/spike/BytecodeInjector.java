@@ -66,10 +66,21 @@ public class BytecodeInjector {
         ClassNode classNode = new ClassNode();
         new ClassReader(classBytes).accept(classNode, 0);
 
+        int injectionCount = 0;
         for (MethodNode methodNode : classNode.methods) {
             if (targetMethodName.equals(methodNode.name)) {
-                injectIntoMethod(methodNode);
+                injectionCount += injectIntoMethod(methodNode);
             }
+        }
+
+        if (injectionCount == 0) {
+            // Fail loudly rather than silently returning an unmodified class: a future game
+            // update could shift line numbers, rename fields, or otherwise break the match,
+            // and a silent no-op here would be indistinguishable from "everything is fine" --
+            // exactly the failure mode this class exists to avoid.
+            throw new IllegalStateException("No matching " + firstTriggerFieldName + "/"
+                    + secondTriggerFieldName + " field pair found in " + targetMethodName
+                    + "() -- injection target may have changed");
         }
 
         ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
@@ -77,15 +88,16 @@ public class BytecodeInjector {
         return writer.toByteArray();
     }
 
-    private void injectIntoMethod(MethodNode methodNode) {
+    private int injectIntoMethod(MethodNode methodNode) {
         InsnList instructions = methodNode.instructions;
+        int injectionCount = 0;
 
         for (AbstractInsnNode insn : instructions.toArray()) {
             if (!isMatchingGetStatic(insn, firstTriggerFieldOwner, firstTriggerFieldName)) {
                 continue;
             }
 
-            AbstractInsnNode next = insn.getNext();
+            AbstractInsnNode next = nextRealInstruction(insn);
             if (!isMatchingGetStatic(next, secondTriggerFieldOwner, secondTriggerFieldName)) {
                 continue;
             }
@@ -95,7 +107,24 @@ public class BytecodeInjector {
             injected.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "zombie/characters/IsoPlayer", "getOnlineID", "()S", false));
             injected.add(new MethodInsnNode(Opcodes.INVOKESTATIC, patchMethodOwner, patchMethodName, patchMethodDescriptor, false));
             instructions.insertBefore(insn, injected);
+            injectionCount++;
         }
+
+        return injectionCount;
+    }
+
+    /**
+     * Skips pseudo-instructions (labels, line numbers, frames -- anything with opcode -1) that
+     * ASM's tree API may place between two real instructions, so "immediately followed by"
+     * matches on actual bytecode adjacency rather than on incidental debug-info placement that
+     * could shift with a future recompile.
+     */
+    private static AbstractInsnNode nextRealInstruction(AbstractInsnNode insn) {
+        AbstractInsnNode next = insn.getNext();
+        while (next != null && next.getOpcode() < 0) {
+            next = next.getNext();
+        }
+        return next;
     }
 
     private static boolean isMatchingGetStatic(AbstractInsnNode insn, String owner, String fieldName) {

@@ -10,8 +10,8 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BytecodeInjectorTest {
@@ -48,7 +48,7 @@ class BytecodeInjectorTest {
     }
 
     @Test
-    void inject_nonMatchingMethod_doesNotInsertPatchCall() throws IOException {
+    void inject_nonMatchingMethod_throwsRatherThanSilentlyDoingNothing() throws IOException {
         byte[] fixtureBytes = readFixtureBytes();
         BytecodeInjector injector = new BytecodeInjector(
                 "someOtherMethodName",
@@ -56,11 +56,21 @@ class BytecodeInjectorTest {
                 "glas/voip/spike/InjectionFixture", "minDistance",
                 "glas/voip/patch/TierPatch", "applyTierDistances", "(S)V");
 
-        byte[] transformed = injector.inject(fixtureBytes);
+        assertThrows(IllegalStateException.class, () -> injector.inject(fixtureBytes),
+                "zero matches must fail loudly, not silently return the class unchanged");
+    }
 
-        String disassembly = disassemble(transformed);
-        assertFalse(disassembly.contains(PATCH_CALL),
-                "no injection should happen when the target method name doesn't match");
+    @Test
+    void inject_matchingMethodButNoAdjacentPair_throwsRatherThanSilentlyDoingNothing() throws IOException {
+        byte[] fixtureBytes = readFixtureBytes();
+        BytecodeInjector injector = new BytecodeInjector(
+                "computeSomething",
+                "glas/voip/spike/InjectionFixture", "minDistance",
+                "glas/voip/spike/InjectionFixture", "maxDistance",
+                "glas/voip/patch/TierPatch", "applyTierDistances", "(S)V");
+
+        assertThrows(IllegalStateException.class, () -> injector.inject(fixtureBytes),
+                "the fixture never reads minDistance immediately followed by maxDistance (only the reverse order), so this must fail loudly too");
     }
 
     private byte[] readFixtureBytes() throws IOException {
