@@ -1,13 +1,12 @@
-import java.io.FileInputStream
 import java.util.Properties
 
 val localProperties = Properties().apply {
     val localPropertiesFile = rootProject.file("local.properties")
     if (localPropertiesFile.exists()) {
-        load(FileInputStream(localPropertiesFile))
+        localPropertiesFile.inputStream().use { load(it) }
     }
 }
-val pzInstallPath: String? = localProperties.getProperty("pz.install.path")?.ifBlank { null }
+val pzInstallPath: String? = localProperties.getProperty("pz.install.path")?.trim()?.ifBlank { null }
 
 plugins {
     java
