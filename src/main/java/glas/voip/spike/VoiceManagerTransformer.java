@@ -28,10 +28,16 @@ public class VoiceManagerTransformer implements ClassFileTransformer {
             return null;
         }
 
+        // The JVM swallows exceptions thrown from transform() -- it neither propagates them
+        // nor lets class loading fail, so without an explicit log line here a dump failure is
+        // silently indistinguishable from "the transformer never matched" during manual
+        // in-game verification (the whole point of this spike).
         try {
             dumpBytecode(classfileBuffer);
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to dump " + TARGET_CLASS + " bytecode", e);
+            System.out.println("[GlasVoipMod spike] wrote bytecode dump to " + dumpOutputPath);
+        } catch (Exception e) {
+            System.err.println("[GlasVoipMod spike] failed to dump " + TARGET_CLASS + " bytecode: " + e);
+            e.printStackTrace();
         }
 
         return null;
