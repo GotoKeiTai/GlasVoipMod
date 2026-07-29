@@ -1,0 +1,9 @@
+version=1
+title=Glas VOIP
+description=Mod compagnon du serveur "Pour qui sonne le glas" (Project Zomboid roleplay).
+description=
+description=Permet aux joueurs d'ajuster eux-memes leur portee de voix en jeu : chuchoter, parler, ou hurler, via une simple touche (B par defaut).
+description=
+description=Ce mod est concu pour les joueurs du serveur -- non destine a une decouverte publique sur le Workshop.
+tags=
+visibility=public
