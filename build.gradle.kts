@@ -1,0 +1,42 @@
+plugins {
+    java
+}
+
+group = "glas.voip"
+version = "0.1.0-spike"
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation("org.ow2.asm:asm:9.10.1")
+    implementation("org.ow2.asm:asm-util:9.10.1")
+
+    testImplementation(platform("org.junit:junit-bom:5.12.2"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+tasks.test {
+    useJUnitPlatform()
+}
+
+tasks.jar {
+    manifest {
+        attributes(
+            "Premain-Class" to "glas.voip.spike.Agent",
+            "Can-Retransform-Classes" to "true"
+        )
+    }
+    // The agent jar must be self-contained (fat jar): it's loaded via -javaagent before the
+    // game's own classpath is set up, so ASM can't be resolved externally at that point.
+    from({
+        configurations.runtimeClasspath.get().filter { it.name.endsWith("jar") }.map { zipTree(it) }
+    })
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
