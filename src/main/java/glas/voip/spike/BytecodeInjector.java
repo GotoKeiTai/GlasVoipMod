@@ -83,6 +83,18 @@ public class BytecodeInjector {
                     + "() -- injection target may have changed");
         }
 
+        // COMPUTE_FRAMES's default getCommonSuperClass() resolves common supertypes via
+        // Class.forName on the calling code's own classloader. Doing this from inside
+        // ClassFileTransformer.transform(), while the class being transformed is itself
+        // mid-definition, is a known source of ClassCircularityError for Java agents in
+        // general. Manually verified against the real game (launched with this agent attached
+        // via a temporary launch-option injection) that this does NOT occur for
+        // UpdateVMClient() specifically -- no VerifyError/ClassCircularityError, injection
+        // logged successfully, game continued running normally. If a future game update to
+        // this method's frame complexity ever triggers it, the fix is overriding
+        // ClassWriter.getCommonSuperClass(String, String) in a small subclass to resolve types
+        // via the ClassLoader already passed into transform(ClassLoader loader, ...)
+        // (Class.forName(name, false, loader)) instead of the default.
         ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
         classNode.accept(writer);
         return writer.toByteArray();
