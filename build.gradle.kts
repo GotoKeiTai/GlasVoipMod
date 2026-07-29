@@ -35,6 +35,9 @@ tasks.jar {
     }
     // The agent jar must be self-contained (fat jar): it's loaded via -javaagent before the
     // game's own classpath is set up, so ASM can't be resolved externally at that point.
+    // DIY merge (not the shadow plugin) is fine while the only dependency is ASM, which ships
+    // no ServiceLoader provider files or signed entries. Revisit with a proper shadow-jar
+    // plugin before adding dependencies that do (EXCLUDE would then silently drop entries).
     from({
         configurations.runtimeClasspath.get().filter { it.name.endsWith("jar") }.map { zipTree(it) }
     })
