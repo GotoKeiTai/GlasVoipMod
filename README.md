@@ -58,9 +58,10 @@ Requires JDK 17.
 ./gradlew clean jar
 ```
 
-Produces `build/libs/GlasVoipMod-0.1.0-spike.jar` (a self-contained
+Produces `build/libs/GlasVoipMod-1.0.0.jar` (a self-contained
 fat jar, since it's loaded via `-javaagent` before the game's own
-classpath exists).
+classpath exists) — the filename tracks whatever `version` is
+currently set to in `build.gradle.kts`.
 
 ## Local testing (before Workshop publishing)
 
@@ -72,7 +73,7 @@ classpath exists).
    General > Launch Options):
 
    ```
-   -javaagent:/absolute/path/to/GlasVoipMod-0.1.0-spike.jar --
+   -javaagent:/absolute/path/to/GlasVoipMod-1.0.0.jar --
    ```
 
    (the trailing `--` matches the convention already used for
