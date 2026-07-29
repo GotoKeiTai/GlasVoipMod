@@ -14,11 +14,18 @@ import java.security.ProtectionDomain;
 public class VoiceManagerTransformer implements ClassFileTransformer {
 
     public static final String TARGET_CLASS = "zombie/core/raknet/VoiceManager";
+    private static final String TARGET_METHOD = "UpdateVMClient";
 
     private final Path dumpOutputPath;
+    private final BytecodeInjector injector;
 
     public VoiceManagerTransformer(Path dumpOutputPath) {
         this.dumpOutputPath = dumpOutputPath;
+        this.injector = new BytecodeInjector(
+                TARGET_METHOD,
+                TARGET_CLASS, "maxDistance",
+                TARGET_CLASS, "minDistance",
+                "glas/voip/patch/TierPatch", "applyTierDistances", "(S)V");
     }
 
     @Override
@@ -29,9 +36,9 @@ public class VoiceManagerTransformer implements ClassFileTransformer {
         }
 
         // The JVM swallows exceptions thrown from transform() -- it neither propagates them
-        // nor lets class loading fail, so without an explicit log line here a dump failure is
+        // nor lets class loading fail, so without an explicit log line here a failure is
         // silently indistinguishable from "the transformer never matched" during manual
-        // in-game verification (the whole point of this spike).
+        // in-game verification.
         try {
             dumpBytecode(classfileBuffer);
             System.out.println("[GlasVoipMod spike] wrote bytecode dump to " + dumpOutputPath);
@@ -40,7 +47,15 @@ public class VoiceManagerTransformer implements ClassFileTransformer {
             e.printStackTrace();
         }
 
-        return null;
+        try {
+            byte[] patched = injector.inject(classfileBuffer);
+            System.out.println("[GlasVoipMod] injected tier patch into " + TARGET_CLASS + "." + TARGET_METHOD + "()");
+            return patched;
+        } catch (Exception e) {
+            System.err.println("[GlasVoipMod] failed to inject tier patch, leaving class unmodified: " + e);
+            e.printStackTrace();
+            return null;
+        }
     }
 
     private void dumpBytecode(byte[] classBytes) throws IOException {
