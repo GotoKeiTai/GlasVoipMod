@@ -1,5 +1,7 @@
 package glas.voip.patch;
 
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -13,20 +15,17 @@ class TierDistanceCalculatorTest {
             new TierDistanceCalculator.Distances(4.0f, 30.0f)
     });
 
-    @Test
-    void distancesForTier_validTier_returnsConfiguredDistances() {
-        TierDistanceCalculator.Distances result = calculator.distancesForTier(1);
+    @ParameterizedTest
+    @CsvSource({
+            "0, 1.0, 3.0",
+            "1, 2.0, 10.0",
+            "2, 4.0, 30.0"
+    })
+    void distancesForTier_validTier_returnsConfiguredDistances(int tier, float expectedMin, float expectedMax) {
+        TierDistanceCalculator.Distances result = calculator.distancesForTier(tier);
 
-        assertEquals(2.0f, result.minDistance());
-        assertEquals(10.0f, result.maxDistance());
-    }
-
-    @Test
-    void distancesForTier_differentValidTier_returnsDifferentDistances() {
-        TierDistanceCalculator.Distances result = calculator.distancesForTier(2);
-
-        assertEquals(4.0f, result.minDistance());
-        assertEquals(30.0f, result.maxDistance());
+        assertEquals(expectedMin, result.minDistance());
+        assertEquals(expectedMax, result.maxDistance());
     }
 
     @Test
