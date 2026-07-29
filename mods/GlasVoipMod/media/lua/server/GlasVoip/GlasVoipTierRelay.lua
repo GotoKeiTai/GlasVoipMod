@@ -21,6 +21,17 @@ local function onClientCommand(module, command, player, args)
     end
 
     local onlinePlayers = getOnlinePlayers()
+    if not onlinePlayers then
+        -- getOnlinePlayers() is nil under Project Zomboid's singleplayer embedded server
+        -- (zombie.spnetwork.SinglePlayerServer) -- fall back to relaying directly to the
+        -- sender so solo/singleplayer testing still works instead of crashing.
+        sendServerCommand(player, "GlasVoip", "tierChanged", {
+            onlineId = player:getOnlineID(),
+            tier = tier,
+        })
+        return
+    end
+
     for i = 0, onlinePlayers:size() - 1 do
         sendServerCommand(onlinePlayers:get(i), "GlasVoip", "tierChanged", {
             onlineId = player:getOnlineID(),

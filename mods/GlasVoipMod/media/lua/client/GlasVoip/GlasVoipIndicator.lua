@@ -40,8 +40,8 @@ function GlasVoipIndicatorPanel:render()
         local worldX = self.player:getX() + radius * math.cos(angle)
         local worldY = self.player:getY() + radius * math.sin(angle)
 
-        local screenX = isoToScreenX(self.player, worldX, worldY, self.player:getZ())
-        local screenY = isoToScreenY(self.player, worldX, worldY, self.player:getZ())
+        local screenX = isoToScreenX(self.playerNum, worldX, worldY, self.player:getZ())
+        local screenY = isoToScreenY(self.playerNum, worldX, worldY, self.player:getZ())
 
         self:drawRect(screenX - DOT_SIZE / 2, screenY - DOT_SIZE / 2, DOT_SIZE, DOT_SIZE, alpha, 0.78, 0.64, 0.37)
     end
@@ -58,6 +58,7 @@ function GlasVoipIndicatorPanel:new(player, tier)
     self.__index = self
 
     o.player = player
+    o.playerNum = player:getPlayerNum()
     o.tier = tier
     o.startedMs = getTimestampMs()
     o.durationMs = DISPLAY_MS
@@ -71,6 +72,7 @@ end
 function GlasVoip_showIndicator(player, tier)
     if activeIndicator and not activeIndicator:isRemoved() then
         activeIndicator.player = player
+        activeIndicator.playerNum = player:getPlayerNum()
         activeIndicator.tier = tier
         activeIndicator.startedMs = getTimestampMs()
         return
