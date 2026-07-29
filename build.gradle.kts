@@ -13,10 +13,20 @@ plugins {
 }
 
 group = "glas.voip"
-version = "0.1.0-spike"
+version = "1.0.0"
 
 repositories {
     mavenCentral()
+}
+
+// Hand-written stub source set (see stubs/src/main/java) providing just enough of the real
+// Project Zomboid / Kahlua classes for LuaGlobalTierProvider.java to compile when no real game
+// install is available (CI). This has to be a proper source set -- not a raw file path -- so
+// Gradle actually compiles the .java stubs into .class files before they're put on a classpath.
+sourceSets {
+    create("stubs") {
+        java.srcDir("stubs/src/main/java")
+    }
 }
 
 dependencies {
@@ -26,6 +36,8 @@ dependencies {
 
     if (pzInstallPath != null) {
         compileOnly(files(pzInstallPath))
+    } else {
+        compileOnly(sourceSets["stubs"].output)
     }
 
     testImplementation(platform("org.junit:junit-bom:5.12.2"))
