@@ -1,66 +1,107 @@
 package glas.voip.spike;
 
 import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.FieldInsnNode;
+import org.objectweb.asm.tree.InsnList;
+import org.objectweb.asm.tree.MethodInsnNode;
+import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.VarInsnNode;
 
 /**
- * Inserts a call to a static "patch" method right before a specific field read
- * (GETSTATIC) inside a specific method of a specific class. Generic and
- * parameterized on purpose: lets this be tested against a small synthetic
- * fixture class instead of needing real game bytecode, which is never
- * committed to this repo.
+ * Inserts a call to a static "patch" method right before a specific, precisely-located pair of
+ * adjacent field reads (GETSTATIC field1 immediately followed by GETSTATIC field2, with no
+ * instruction between them) inside a specific method.
+ * <p>
+ * Matching on an adjacent pair rather than a single field name matters: the real target
+ * ({@code VoiceManager.UpdateVMClient()}) reads {@code maxDistance} twice -- once as part of
+ * the exact {@code maxDistance}-then-{@code minDistance} pair that feeds the volume
+ * computation this project needs to intercept, and once completely separately a few lines
+ * later as a standalone distance check. Matching on the single field name alone would have
+ * injected at both sites; matching on the adjacent pair matches only the first (confirmed
+ * against the real game's disassembled bytecode during this project's research).
+ * <p>
+ * Uses ASM's tree API (`ClassNode`/`MethodNode`/`InsnList`) rather than the streaming
+ * `ClassVisitor`/`MethodVisitor` API, since detecting "this instruction is followed by that
+ * specific other instruction" needs one-instruction lookahead, which the tree API's full
+ * in-memory instruction list gives directly -- the streaming API would need fragile manual
+ * buffering across every possible instruction-visit method to achieve the same thing.
+ * <p>
+ * Only the field/method names are parameterized (letting this be tested against a small
+ * synthetic fixture class instead of needing real, non-redistributable game bytecode); the
+ * injected instruction sequence itself (load local variable slot 8, call
+ * {@code IsoPlayer.getOnlineID()}, pass the result to the configured patch method) is fixed,
+ * matching the one real call site this project targets -- this class is not a general-purpose
+ * bytecode-injection framework.
  */
 public class BytecodeInjector {
 
-    private final String targetClassInternalName;
     private final String targetMethodName;
-    private final String triggerFieldOwner;
-    private final String triggerFieldName;
+    private final String firstTriggerFieldOwner;
+    private final String firstTriggerFieldName;
+    private final String secondTriggerFieldOwner;
+    private final String secondTriggerFieldName;
     private final String patchMethodOwner;
     private final String patchMethodName;
     private final String patchMethodDescriptor;
 
-    public BytecodeInjector(String targetClassInternalName, String targetMethodName,
-                             String triggerFieldOwner, String triggerFieldName,
+    public BytecodeInjector(String targetMethodName,
+                             String firstTriggerFieldOwner, String firstTriggerFieldName,
+                             String secondTriggerFieldOwner, String secondTriggerFieldName,
                              String patchMethodOwner, String patchMethodName, String patchMethodDescriptor) {
-        this.targetClassInternalName = targetClassInternalName;
         this.targetMethodName = targetMethodName;
-        this.triggerFieldOwner = triggerFieldOwner;
-        this.triggerFieldName = triggerFieldName;
+        this.firstTriggerFieldOwner = firstTriggerFieldOwner;
+        this.firstTriggerFieldName = firstTriggerFieldName;
+        this.secondTriggerFieldOwner = secondTriggerFieldOwner;
+        this.secondTriggerFieldName = secondTriggerFieldName;
         this.patchMethodOwner = patchMethodOwner;
         this.patchMethodName = patchMethodName;
         this.patchMethodDescriptor = patchMethodDescriptor;
     }
 
     public byte[] inject(byte[] classBytes) {
-        ClassReader reader = new ClassReader(classBytes);
-        ClassWriter writer = new ClassWriter(reader, ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
+        ClassNode classNode = new ClassNode();
+        new ClassReader(classBytes).accept(classNode, 0);
 
-        ClassVisitor classVisitor = new ClassVisitor(Opcodes.ASM9, writer) {
-            @Override
-            public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-                MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
-                if (!targetMethodName.equals(name)) {
-                    return mv;
-                }
-                return new MethodVisitor(Opcodes.ASM9, mv) {
-                    @Override
-                    public void visitFieldInsn(int opcode, String owner, String fieldName, String fieldDescriptor) {
-                        if (opcode == Opcodes.GETSTATIC && triggerFieldOwner.equals(owner) && triggerFieldName.equals(fieldName)) {
-                            super.visitVarInsn(Opcodes.ALOAD, 8);
-                            super.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "zombie/characters/IsoPlayer", "getOnlineID", "()S", false);
-                            super.visitMethodInsn(Opcodes.INVOKESTATIC, patchMethodOwner, patchMethodName, patchMethodDescriptor, false);
-                        }
-                        super.visitFieldInsn(opcode, owner, fieldName, fieldDescriptor);
-                    }
-                };
+        for (MethodNode methodNode : classNode.methods) {
+            if (targetMethodName.equals(methodNode.name)) {
+                injectIntoMethod(methodNode);
             }
-        };
+        }
 
-        reader.accept(classVisitor, 0);
+        ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
+        classNode.accept(writer);
         return writer.toByteArray();
+    }
+
+    private void injectIntoMethod(MethodNode methodNode) {
+        InsnList instructions = methodNode.instructions;
+
+        for (AbstractInsnNode insn : instructions.toArray()) {
+            if (!isMatchingGetStatic(insn, firstTriggerFieldOwner, firstTriggerFieldName)) {
+                continue;
+            }
+
+            AbstractInsnNode next = insn.getNext();
+            if (!isMatchingGetStatic(next, secondTriggerFieldOwner, secondTriggerFieldName)) {
+                continue;
+            }
+
+            InsnList injected = new InsnList();
+            injected.add(new VarInsnNode(Opcodes.ALOAD, 8));
+            injected.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "zombie/characters/IsoPlayer", "getOnlineID", "()S", false));
+            injected.add(new MethodInsnNode(Opcodes.INVOKESTATIC, patchMethodOwner, patchMethodName, patchMethodDescriptor, false));
+            instructions.insertBefore(insn, injected);
+        }
+    }
+
+    private static boolean isMatchingGetStatic(AbstractInsnNode insn, String owner, String fieldName) {
+        return insn instanceof FieldInsnNode fieldInsn
+                && fieldInsn.getOpcode() == Opcodes.GETSTATIC
+                && owner.equals(fieldInsn.owner)
+                && fieldName.equals(fieldInsn.name);
     }
 }

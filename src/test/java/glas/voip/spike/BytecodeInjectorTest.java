@@ -9,43 +9,57 @@ import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BytecodeInjectorTest {
 
+    private static final String PATCH_CALL = "INVOKESTATIC glas/voip/patch/TierPatch.applyTierDistances (S)V";
+
     @Test
-    void inject_insertsPatchCallBeforeTriggerField() throws IOException {
+    void inject_insertsPatchCallBeforeAdjacentFieldPair_onlyOnce() throws IOException {
         byte[] fixtureBytes = readFixtureBytes();
         BytecodeInjector injector = new BytecodeInjector(
-                "glas/voip/spike/InjectionFixture", "computeSomething",
+                "computeSomething",
                 "glas/voip/spike/InjectionFixture", "maxDistance",
+                "glas/voip/spike/InjectionFixture", "minDistance",
                 "glas/voip/patch/TierPatch", "applyTierDistances", "(S)V");
 
         byte[] transformed = injector.inject(fixtureBytes);
 
         String disassembly = disassemble(transformed);
-        int patchCallIndex = disassembly.indexOf("INVOKESTATIC glas/voip/patch/TierPatch.applyTierDistances (S)V");
-        int triggerFieldIndex = disassembly.indexOf("GETSTATIC glas/voip/spike/InjectionFixture.maxDistance : F");
+        assertEquals(1, countOccurrences(disassembly, PATCH_CALL),
+                "the fixture has a second, non-adjacent read of maxDistance later in the method -- "
+                        + "the injector must match only the adjacent maxDistance/minDistance pair, not that second site");
 
-        assertTrue(patchCallIndex >= 0, "patch call should be present in transformed bytecode");
-        assertTrue(triggerFieldIndex >= 0, "trigger field read should still be present");
-        assertTrue(patchCallIndex < triggerFieldIndex, "patch call must come before the trigger field read");
+        int aloadIndex = disassembly.indexOf("ALOAD 8");
+        int invokeGetOnlineIdIndex = disassembly.indexOf("INVOKEVIRTUAL zombie/characters/IsoPlayer.getOnlineID ()S");
+        int patchCallIndex = disassembly.indexOf(PATCH_CALL);
+        int firstFieldIndex = disassembly.indexOf("GETSTATIC glas/voip/spike/InjectionFixture.maxDistance : F");
+        int secondFieldIndex = disassembly.indexOf("GETSTATIC glas/voip/spike/InjectionFixture.minDistance : F");
+
+        assertTrue(aloadIndex >= 0, "injected ALOAD 8 should be present");
+        assertTrue(aloadIndex < invokeGetOnlineIdIndex, "ALOAD 8 must come before the getOnlineID call");
+        assertTrue(invokeGetOnlineIdIndex < patchCallIndex, "getOnlineID call must come before the patch call");
+        assertTrue(patchCallIndex < firstFieldIndex, "patch call must come before the first trigger field read");
+        assertTrue(firstFieldIndex < secondFieldIndex, "the two trigger field reads must remain adjacent and in order");
     }
 
     @Test
-    void inject_nonMatchingMethod_leavesBytecodeUnchanged() throws IOException {
+    void inject_nonMatchingMethod_doesNotInsertPatchCall() throws IOException {
         byte[] fixtureBytes = readFixtureBytes();
         BytecodeInjector injector = new BytecodeInjector(
-                "glas/voip/spike/InjectionFixture", "someOtherMethodName",
+                "someOtherMethodName",
                 "glas/voip/spike/InjectionFixture", "maxDistance",
+                "glas/voip/spike/InjectionFixture", "minDistance",
                 "glas/voip/patch/TierPatch", "applyTierDistances", "(S)V");
 
         byte[] transformed = injector.inject(fixtureBytes);
 
         String disassembly = disassemble(transformed);
-        assertFalse(disassembly.contains("TierPatch.applyTierDistances"),
+        assertFalse(disassembly.contains(PATCH_CALL),
                 "no injection should happen when the target method name doesn't match");
     }
 
@@ -62,5 +76,15 @@ class BytecodeInjectorTest {
         StringWriter output = new StringWriter();
         reader.accept(new TraceClassVisitor(new PrintWriter(output)), 0);
         return output.toString();
+    }
+
+    private int countOccurrences(String haystack, String needle) {
+        int count = 0;
+        int index = 0;
+        while ((index = haystack.indexOf(needle, index)) >= 0) {
+            count++;
+            index += needle.length();
+        }
+        return count;
     }
 }
