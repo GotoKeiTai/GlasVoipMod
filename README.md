@@ -14,9 +14,13 @@ living in this same repo:
 
 ## How it works
 
-1. Press **B** in-game to cycle through the three tiers. A speech
-   bubble confirms the new tier, and a gold dot-ring briefly appears
-   on the ground around you (visible only to yourself).
+1. Press **B** (default) in-game to cycle through the three tiers. A
+   speech bubble confirms the new tier, and a gold dot-ring briefly
+   appears on the ground around you (visible only to yourself). The
+   key is fully rebindable: Options -> Keybinding -> **Glas VOIP** ->
+   **Cycle VOIP Tier** (`GlasVoipTierController.lua` registers this
+   entry via `Events.OnGameBoot`; the category/label translations
+   live in `media/lua/shared/Translate/{EN,FR}/UI_*.txt`).
 2. The chosen tier is sent to the server (`GlasVoipTierController.lua`),
    which broadcasts it to every connected client
    (`GlasVoipTierRelay.lua`).
